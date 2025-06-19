@@ -1,92 +1,85 @@
 <!DOCTYPE html>
-<html>
+<html lang="zh-TW">
 <head>
-  <meta charset="UTF-8">
-  <title>PDF 餐點抽籤工具</title>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
+  <meta charset="UTF-8" />
+  <title>隨機餐點抽選器</title>
   <style>
-    body { font-family: sans-serif; padding: 20px; max-width: 600px; margin: auto; }
-    .category { margin-top: 20px; padding: 10px; border: 1px solid #ccc; border-radius: 8px; }
-    .item { margin-left: 10px; }
-    button { margin-top: 10px; }
-    input { margin: 0 5px; width: 80px; }
+    body { font-family: Arial, sans-serif; margin: 2rem; }
+    label { margin-right: 0.5rem; }
+    input { width: 80px; margin-right: 1rem; }
+    button { padding: 0.5rem 1rem; }
+    .result { margin-top: 1rem; font-size: 1.2rem; }
   </style>
 </head>
 <body>
-  <h2>📄 上傳 PDF 並抽兩道餐點</h2>
-  <input type="file" id="fileInput" /><br/>
+  <h1>隨機餐點抽選器</h1>
 
-  <div style="margin-top: 10px;">
-    <label>預算 ≤</label><input id="maxPrice" type="number" value="200" />
-    <label>熱量 ≤</label><input id="maxKcal" type="number" value="1500" />
-  </div>
+  <label for="maxPrice">最高預算(元):</label>
+  <input type="number" id="maxPrice" value="150" min="0" />
+  
+  <label for="maxKcal">最高熱量(kcal):</label>
+  <input type="number" id="maxKcal" value="600" min="0" />
 
-  <div id="output"></div>
+  <button id="drawBtn">抽兩道菜 (主食 + 副食)</button>
+
+  <div class="result" id="result"></div>
 
   <script>
-    let data = [];
+    // JSON 資料陣列
+    const data = [
+      {"category":"主食","name":"富錦樹‑剝皮辣蝦滑蛋燴飯","kcal":603,"price":99},
+      {"category":"主食","name":"心潮飯店‑醬燒豬肉飯","kcal":null,"price":99},
+      {"category":"主食","name":"蛋白力飯卷‑紐奧良烤雞風味","kcal":292,"price":89},
+      {"category":"主食","name":"乾杯炭火燒肉握便當","kcal":525,"price":69},
+      {"category":"副食","name":"牛肉起司可頌","kcal":323,"price":85},
+      {"category":"副食","name":"燻雞菇菇彩蔬三明治","kcal":null,"price":69},
+      {"category":"副食","name":"醬燒里肌鮮蔬三明治","kcal":null,"price":69},
+      {"category":"水果","name":"美國空運藍莓","kcal":null,"price":119},
+      {"category":"水果","name":"愛文芒果切片","kcal":null,"price":89},
+      {"category":"水果","name":"紐西蘭雙色奇異果切片","kcal":null,"price":69}
+    ];
 
-    document.getElementById('fileInput').addEventListener('change', async (e) => {
-      const file = e.target.files[0];
-      if (!file) return;
-      const pdf = await pdfjsLib.getDocument({ data: await file.arrayBuffer() }).promise;
+    function getRandomItem(arr) {
+      if (arr.length === 0) return null;
+      const idx = Math.floor(Math.random() * arr.length);
+      return arr[idx];
+    }
 
-      data = [];
-      let fullText = '';
-      for (let i = 1; i <= pdf.numPages; i++) {
-        const content = await (await pdf.getPage(i)).getTextContent();
-        fullText += content.items.map(item => item.str).join(' ') + '\n';
+    document.getElementById('drawBtn').addEventListener('click', () => {
+      const maxPrice = Number(document.getElementById('maxPrice').value);
+      const maxKcal = Number(document.getElementById('maxKcal').value);
+
+      // 篩選符合預算和熱量限制的主食（kcal=null 視為不限）
+      const mains = data.filter(item => 
+        item.category === '主食' && 
+        item.price !== null && item.price <= maxPrice &&
+        (item.kcal === null || item.kcal <= maxKcal)
+      );
+
+      // 篩選符合預算和熱量限制的副食
+      const sides = data.filter(item => 
+        item.category === '副食' && 
+        item.price !== null && item.price <= maxPrice &&
+        (item.kcal === null || item.kcal <= maxKcal)
+      );
+
+      if (mains.length === 0 || sides.length === 0) {
+        document.getElementById('result').innerText = '找不到符合條件的餐點，請調整預算或熱量限制。';
+        return;
       }
 
-      fullText.split('\n').forEach(line => {
-        const parts = line.trim().split(/\s+/);
-        if (parts.length >= 4) {
-          const [category, name, kcal, price] = parts;
-          if (!isNaN(kcal) && !isNaN(price)) {
-            data.push({category, name, kcal, price});
-          }
-        }
-      });
+      const mainDish = getRandomItem(mains);
+      const sideDish = getRandomItem(sides);
 
-      const grouped = {};
-      data.forEach(i => {
-        if (!grouped[i.category]) grouped[i.category] = [];
-        grouped[i.category].push(i);
-      });
+      const totalPrice = mainDish.price + sideDish.price;
+      const totalKcal = 
+        (mainDish.kcal || 0) + (sideDish.kcal || 0);
 
-      const out = document.getElementById('output');
-      out.innerHTML = '';
-      for (const [cat, items] of Object.entries(grouped)) {
-        const div = document.createElement('div');
-        div.className = 'category';
-        div.innerHTML = `<h3>📁 ${cat}</h3>`;
-        items.forEach(i => {
-          div.innerHTML += `<div class="item">🍱 ${i.name} ｜ ${i.kcal} kcal ｜ $${i.price}</div>`;
-        });
-        out.appendChild(div);
-      }
+      let resultText = `主食：${mainDish.name}，價格：${mainDish.price}元，熱量：${mainDish.kcal ?? '未知'}kcal\n`;
+      resultText += `副食：${sideDish.name}，價格：${sideDish.price}元，熱量：${sideDish.kcal ?? '未知'}kcal\n`;
+      resultText += `總價格：${totalPrice}元，總熱量：${totalKcal}kcal`;
 
-      const comboBtn = document.createElement('button');
-      comboBtn.textContent = '🎲 隨機抽兩道';
-      comboBtn.onclick = () => {
-        const maxPrice = parseInt(document.getElementById('maxPrice').value);
-        const maxKcal = parseInt(document.getElementById('maxKcal').value);
-        if (data.length < 2) return alert('需至少兩個資料才可抽。');
-        let tries = 100, a, b, tp, tk;
-        while (tries--) {
-          a = data[Math.floor(Math.random() * data.length)];
-          b = data[Math.floor(Math.random() * data.length)];
-          if (a.name === b.name && a.category === b.category) continue;
-          tp = parseInt(a.price) + parseInt(b.price);
-          tk = parseInt(a.kcal) + parseInt(b.kcal);
-          if (tp <= maxPrice && tk <= maxKcal) break;
-        }
-        if (tp > maxPrice || tk > maxKcal) {
-          return alert('未找到符合條件的組合，請放寬上限');
-        }
-        alert(`🎯 今日推薦：\n1️⃣ ${a.name}（${a.kcal} kcal / $${a.price}）\n2️⃣ ${b.name}（${b.kcal} kcal / $${b.price}）\n➡️ 總計：${tk} kcal，$${tp}`);
-      };
-      out.appendChild(comboBtn);
+      document.getElementById('result').innerText = resultText;
     });
   </script>
 </body>
