@@ -1,86 +1,99 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
-  <meta charset="UTF-8" />
-  <title>隨機餐點抽選器</title>
-  <style>
-    body { font-family: Arial, sans-serif; margin: 2rem; }
-    label { margin-right: 0.5rem; }
-    input { width: 80px; margin-right: 1rem; }
-    button { padding: 0.5rem 1rem; }
-    .result { margin-top: 1rem; font-size: 1.2rem; }
-  </style>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>餐點抽取系統</title>
+<style>
+  body { font-family: "微軟正黑體", sans-serif; max-width: 600px; margin: auto; padding: 1rem; }
+  h1 { text-align: center; }
+  label, input { margin: 0.5rem 0; display: block; }
+  button { margin-top: 1rem; padding: 0.5rem 1rem; font-size: 1rem; }
+  #result { margin-top: 1rem; padding: 1rem; border: 1px solid #ccc; background: #f9f9f9; }
+</style>
 </head>
 <body>
-  <h1>隨機餐點抽選器</h1>
 
-  <label for="maxPrice">最高預算(元):</label>
-  <input type="number" id="maxPrice" value="150" min="0" />
-  
-  <label for="maxKcal">最高熱量(kcal):</label>
-  <input type="number" id="maxKcal" value="600" min="0" />
+<h1>餐點隨機抽取系統</h1>
 
-  <button id="drawBtn">抽兩道菜 (主食 + 副食)</button>
+<label>
+  預算上限 (元)：
+  <input type="number" id="maxPrice" placeholder="例如 150" />
+</label>
 
-  <div class="result" id="result"></div>
+<label>
+  熱量上限 (kcal)：
+  <input type="number" id="maxKcal" placeholder="例如 600" />
+</label>
 
-  <script>
-    // JSON 資料陣列
-    const data = [
-      {"category":"主食","name":"富錦樹‑剝皮辣蝦滑蛋燴飯","kcal":603,"price":99},
-      {"category":"主食","name":"心潮飯店‑醬燒豬肉飯","kcal":null,"price":99},
-      {"category":"主食","name":"蛋白力飯卷‑紐奧良烤雞風味","kcal":292,"price":89},
-      {"category":"主食","name":"乾杯炭火燒肉握便當","kcal":525,"price":69},
-      {"category":"副食","name":"牛肉起司可頌","kcal":323,"price":85},
-      {"category":"副食","name":"燻雞菇菇彩蔬三明治","kcal":null,"price":69},
-      {"category":"副食","name":"醬燒里肌鮮蔬三明治","kcal":null,"price":69},
-      {"category":"水果","name":"美國空運藍莓","kcal":null,"price":119},
-      {"category":"水果","name":"愛文芒果切片","kcal":null,"price":89},
-      {"category":"水果","name":"紐西蘭雙色奇異果切片","kcal":null,"price":69}
-    ];
+<button id="drawBtn">抽取餐點（主食 + 副食）</button>
 
-    function getRandomItem(arr) {
-      if (arr.length === 0) return null;
-      const idx = Math.floor(Math.random() * arr.length);
-      return arr[idx];
+<div id="result"></div>
+
+<h2>所有餐點清單</h2>
+<ul id="allItems"></ul>
+
+<script>
+  const data = [
+    {"category":"主食","name":"富錦樹‑剝皮辣蝦滑蛋燴飯","kcal":603,"price":99},
+    {"category":"主食","name":"心潮飯店‑醬燒豬肉飯","kcal":null,"price":99},
+    {"category":"主食","name":"蛋白力飯卷‑紐奧良烤雞風味","kcal":292,"price":89},
+    {"category":"主食","name":"乾杯炭火燒肉握便當","kcal":525,"price":69},
+    {"category":"副食","name":"牛肉起司可頌","kcal":323,"price":85},
+    {"category":"副食","name":"燻雞菇菇彩蔬三明治","kcal":null,"price":69},
+    {"category":"副食","name":"醬燒里肌鮮蔬三明治","kcal":null,"price":69},
+    {"category":"水果","name":"美國空運藍莓","kcal":null,"price":119},
+    {"category":"水果","name":"愛文芒果切片","kcal":null,"price":89},
+    {"category":"水果","name":"紐西蘭雙色奇異果切片","kcal":null,"price":69}
+  ];
+
+  // 顯示所有餐點
+  const allList = document.getElementById('allItems');
+  data.forEach(item => {
+    const li = document.createElement('li');
+    li.textContent = `[${item.category}] ${item.name} - 價格: ${item.price} 元, 熱量: ${item.kcal ?? '未知'}`;
+    allList.appendChild(li);
+  });
+
+  // 按鈕事件：抽取符合條件的餐點
+  document.getElementById('drawBtn').addEventListener('click', () => {
+    const maxPrice = Number(document.getElementById('maxPrice').value);
+    const maxKcal = Number(document.getElementById('maxKcal').value);
+    const resultDiv = document.getElementById('result');
+    resultDiv.innerHTML = '';
+
+    // 篩選條件函數
+    function filterByConstraints(items) {
+      return items.filter(item => {
+        const priceOk = isNaN(maxPrice) || item.price <= maxPrice;
+        const kcalOk = isNaN(maxKcal) || item.kcal === null || item.kcal <= maxKcal;
+        return priceOk && kcalOk;
+      });
     }
 
-    document.getElementById('drawBtn').addEventListener('click', () => {
-      const maxPrice = Number(document.getElementById('maxPrice').value);
-      const maxKcal = Number(document.getElementById('maxKcal').value);
+    // 主食與副食分別篩選
+    const mains = filterByConstraints(data.filter(d => d.category === '主食'));
+    const sides = filterByConstraints(data.filter(d => d.category === '副食'));
 
-      // 篩選符合預算和熱量限制的主食（kcal=null 視為不限）
-      const mains = data.filter(item => 
-        item.category === '主食' && 
-        item.price !== null && item.price <= maxPrice &&
-        (item.kcal === null || item.kcal <= maxKcal)
-      );
+    if (mains.length === 0 || sides.length === 0) {
+      resultDiv.textContent = '找不到符合條件的主食或副食，請調整預算或熱量上限。';
+      return;
+    }
 
-      // 篩選符合預算和熱量限制的副食
-      const sides = data.filter(item => 
-        item.category === '副食' && 
-        item.price !== null && item.price <= maxPrice &&
-        (item.kcal === null || item.kcal <= maxKcal)
-      );
+    // 隨機選一個主食和副食
+    const randomMain = mains[Math.floor(Math.random() * mains.length)];
+    const randomSide = sides[Math.floor(Math.random() * sides.length)];
 
-      if (mains.length === 0 || sides.length === 0) {
-        document.getElementById('result').innerText = '找不到符合條件的餐點，請調整預算或熱量限制。';
-        return;
-      }
+    // 顯示結果
+    resultDiv.innerHTML = `
+      <h3>抽取結果</h3>
+      <p>主食：${randomMain.name}（價格：${randomMain.price} 元，熱量：${randomMain.kcal ?? '未知'} kcal）</p>
+      <p>副食：${randomSide.name}（價格：${randomSide.price} 元，熱量：${randomSide.kcal ?? '未知'} kcal）</p>
+      <p>總價格：${randomMain.price + randomSide.price} 元</p>
+      <p>總熱量：${(randomMain.kcal ?? 0) + (randomSide.kcal ?? 0)} kcal（未知熱量視為0計算）</p>
+    `;
+  });
+</script>
 
-      const mainDish = getRandomItem(mains);
-      const sideDish = getRandomItem(sides);
-
-      const totalPrice = mainDish.price + sideDish.price;
-      const totalKcal = 
-        (mainDish.kcal || 0) + (sideDish.kcal || 0);
-
-      let resultText = `主食：${mainDish.name}，價格：${mainDish.price}元，熱量：${mainDish.kcal ?? '未知'}kcal\n`;
-      resultText += `副食：${sideDish.name}，價格：${sideDish.price}元，熱量：${sideDish.kcal ?? '未知'}kcal\n`;
-      resultText += `總價格：${totalPrice}元，總熱量：${totalKcal}kcal`;
-
-      document.getElementById('result').innerText = resultText;
-    });
-  </script>
 </body>
 </html>
