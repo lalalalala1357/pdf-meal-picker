@@ -2,31 +2,23 @@
 <html>
 <head>
   <meta charset="UTF-8">
-  <title>PDF 餐點抽籤小工具</title>
+  <title>PDF 餐點抽籤工具</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
   <style>
     body { font-family: sans-serif; padding: 20px; max-width: 600px; margin: auto; }
     .category { margin-top: 20px; padding: 10px; border: 1px solid #ccc; border-radius: 8px; }
     .item { margin-left: 10px; }
     button { margin-top: 10px; }
-    input, select { margin: 0 5px; }
+    input { margin: 0 5px; width: 80px; }
   </style>
 </head>
 <body>
-  <h2>📄 上傳 PDF 並抽餐點</h2>
+  <h2>📄 上傳 PDF 並抽兩道餐點</h2>
   <input type="file" id="fileInput" /><br/>
 
-  <div style="margin-top: 20px;">
-    <label>副食：</label>
-    <select id="sideType">
-      <option value="all">全部</option>
-      <option value="飲">飲料</option>
-      <option value="點">點心</option>
-    </select>
-    <label>預算 ≤</label>
-    <input id="maxPrice" type="number" value="200" style="width: 60px;" />
-    <label>熱量 ≤</label>
-    <input id="maxKcal" type="number" value="1500" style="width: 60px;" />
+  <div style="margin-top: 10px;">
+    <label>預算 ≤</label><input id="maxPrice" type="number" value="200" />
+    <label>熱量 ≤</label><input id="maxKcal" type="number" value="1500" />
   </div>
 
   <div id="output"></div>
@@ -37,8 +29,7 @@
     document.getElementById('fileInput').addEventListener('change', async (e) => {
       const file = e.target.files[0];
       if (!file) return;
-      const arrayBuffer = await file.arrayBuffer();
-      const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+      const pdf = await pdfjsLib.getDocument({ data: await file.arrayBuffer() }).promise;
 
       data = [];
       let fullText = '';
@@ -76,35 +67,24 @@
       }
 
       const comboBtn = document.createElement('button');
-      comboBtn.textContent = '🎯 抽一組';
+      comboBtn.textContent = '🎲 隨機抽兩道';
       comboBtn.onclick = () => {
-        const sideType = document.getElementById('sideType').value;
         const maxPrice = parseInt(document.getElementById('maxPrice').value);
         const maxKcal = parseInt(document.getElementById('maxKcal').value);
-
-        const mains = data.filter(i => i.category.includes("主"));
-        let sides = data.filter(i => {
-          if (sideType === 'all') return i.category.includes("飲") || i.category.includes("點");
-          return i.category.includes(sideType);
-        });
-
-        if (!mains.length || !sides.length) {
-          return alert('主食或副食不足。');
-        }
-
-        let tries = 100, main, side, tp, tk;
+        if (data.length < 2) return alert('需至少兩個資料才可抽。');
+        let tries = 100, a, b, tp, tk;
         while (tries--) {
-          main = mains[Math.floor(Math.random()*mains.length)];
-          side = sides[Math.floor(Math.random()*sides.length)];
-          tp = parseInt(main.price) + parseInt(side.price);
-          tk = parseInt(main.kcal) + parseInt(side.kcal);
+          a = data[Math.floor(Math.random() * data.length)];
+          b = data[Math.floor(Math.random() * data.length)];
+          if (a.name === b.name && a.category === b.category) continue;
+          tp = parseInt(a.price) + parseInt(b.price);
+          tk = parseInt(a.kcal) + parseInt(b.kcal);
           if (tp <= maxPrice && tk <= maxKcal) break;
         }
         if (tp > maxPrice || tk > maxKcal) {
-          return alert('無符合條件的組合，請調整上限。');
+          return alert('未找到符合條件的組合，請放寬上限');
         }
-
-        alert(`今天吃👣\n主食：${main.name}（${main.kcal} kcal / $${main.price}）\n副食：${side.name}（${side.kcal} kcal / $${side.price}）\n合計：${tk} kcal / $${tp}`);
+        alert(`🎯 今日推薦：\n1️⃣ ${a.name}（${a.kcal} kcal / $${a.price}）\n2️⃣ ${b.name}（${b.kcal} kcal / $${b.price}）\n➡️ 總計：${tk} kcal，$${tp}`);
       };
       out.appendChild(comboBtn);
     });
