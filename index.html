@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>PDF 餐點抽籤小工具</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
+  <style>
+    body { font-family: sans-serif; padding: 20px; max-width: 600px; margin: auto; }
+    .category { margin-top: 20px; padding: 10px; border: 1px solid #ccc; border-radius: 8px; }
+    .item { margin-left: 10px; }
+    button { margin-top: 10px; }
+    input, select { margin: 0 5px; }
+  </style>
+</head>
+<body>
+  <h2>📄 上傳 PDF 並抽餐點</h2>
+  <input type="file" id="fileInput" /><br/>
+
+  <div style="margin-top: 20px;">
+    <label>副食：</label>
+    <select id="sideType">
+      <option value="all">全部</option>
+      <option value="飲">飲料</option>
+      <option value="點">點心</option>
+    </select>
+    <label>預算 ≤</label>
+    <input id="maxPrice" type="number" value="200" style="width: 60px;" />
+    <label>熱量 ≤</label>
+    <input id="maxKcal" type="number" value="1500" style="width: 60px;" />
+  </div>
+
+  <div id="output"></div>
+
+  <script>
+    let data = [];
+
+    document.getElementById('fileInput').addEventListener('change', async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const arrayBuffer = await file.arrayBuffer();
+      const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+
+      data = [];
+      let fullText = '';
+      for (let i = 1; i <= pdf.numPages; i++) {
+        const content = await (await pdf.getPage(i)).getTextContent();
+        fullText += content.items.map(item => item.str).join(' ') + '\n';
+      }
+
+      fullText.split('\n').forEach(line => {
+        const parts = line.trim().split(/\s+/);
+        if (parts.length >= 4) {
+          const [category, name, kcal, price] = parts;
+          if (!isNaN(kcal) && !isNaN(price)) {
+            data.push({category, name, kcal, price});
+          }
+        }
+      });
+
+      const grouped = {};
+      data.forEach(i => {
+        if (!grouped[i.category]) grouped[i.category] = [];
+        grouped[i.category].push(i);
+      });
+
+      const out = document.getElementById('output');
+      out.innerHTML = '';
+      for (const [cat, items] of Object.entries(grouped)) {
+        const div = document.createElement('div');
+        div.className = 'category';
+        div.innerHTML = `<h3>📁 ${cat}</h3>`;
+        items.forEach(i => {
+          div.innerHTML += `<div class="item">🍱 ${i.name} ｜ ${i.kcal} kcal ｜ $${i.price}</div>`;
+        });
+        out.appendChild(div);
+      }
+
+      const comboBtn = document.createElement('button');
+      comboBtn.textContent = '🎯 抽一組';
+      comboBtn.onclick = () => {
+        const sideType = document.getElementById('sideType').value;
+        const maxPrice = parseInt(document.getElementById('maxPrice').value);
+        const maxKcal = parseInt(document.getElementById('maxKcal').value);
+
+        const mains = data.filter(i => i.category.includes("主"));
+        let sides = data.filter(i => {
+          if (sideType === 'all') return i.category.includes("飲") || i.category.includes("點");
+          return i.category.includes(sideType);
+        });
+
+        if (!mains.length || !sides.length) {
+          return alert('主食或副食不足。');
+        }
+
+        let tries = 100, main, side, tp, tk;
+        while (tries--) {
+          main = mains[Math.floor(Math.random()*mains.length)];
+          side = sides[Math.floor(Math.random()*sides.length)];
+          tp = parseInt(main.price) + parseInt(side.price);
+          tk = parseInt(main.kcal) + parseInt(side.kcal);
+          if (tp <= maxPrice && tk <= maxKcal) break;
+        }
+        if (tp > maxPrice || tk > maxKcal) {
+          return alert('無符合條件的組合，請調整上限。');
+        }
+
+        alert(`今天吃👣\n主食：${main.name}（${main.kcal} kcal / $${main.price}）\n副食：${side.name}（${side.kcal} kcal / $${side.price}）\n合計：${tk} kcal / $${tp}`);
+      };
+      out.appendChild(comboBtn);
+    });
+  </script>
+</body>
+</html>
